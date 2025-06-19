@@ -16,7 +16,7 @@ public class PMMOQualityFoods {
     // Define mod id in a common place for everything to reference
     public static final String MODID = "pmmo_quality_foods";
     // Directly reference a slf4j logger
-    private static final Logger LOGGER = LogUtils.getLogger();
+    public static final Logger LOGGER = LogUtils.getLogger();
     public PMMOQualityFoods(IEventBus modEventBus, ModContainer modContainer) {
         // Register our mod's ModConfigSpec so that FML can create and load the config file for us
         modContainer.registerConfig(ModConfig.Type.SERVER, Config.SPEC);
