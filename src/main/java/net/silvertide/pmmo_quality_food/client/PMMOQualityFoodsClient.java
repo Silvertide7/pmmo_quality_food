@@ -1,14 +1,14 @@
-package net.silvertide.pmmo_quality_foods.client;
+package net.silvertide.pmmo_quality_food.client;
 
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.neoforge.client.gui.ConfigurationScreen;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
-import net.silvertide.pmmo_quality_foods.PMMOQualityFoods;
+import net.silvertide.pmmo_quality_food.PMMOQualityFood;
 
 // This class will not load on dedicated servers. Accessing client side code from here is safe.
-@Mod(value = PMMOQualityFoods.MODID, dist = Dist.CLIENT)
+@Mod(value = PMMOQualityFood.MODID, dist = Dist.CLIENT)
 public class PMMOQualityFoodsClient {
     public PMMOQualityFoodsClient(ModContainer container) {
         // Allows NeoForge to create a config screen for this mod's configs.

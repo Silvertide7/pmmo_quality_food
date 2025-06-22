@@ -1,5 +1,6 @@
-package net.silvertide.pmmo_quality_foods.events;
+package net.silvertide.pmmo_quality_food.events;
 
+import de.cadentem.quality_food.util.QualityUtils;
 import harmonised.pmmo.api.APIUtils;
 import harmonised.pmmo.api.enums.EventType;
 import harmonised.pmmo.api.enums.ReqType;
@@ -15,22 +16,29 @@ import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.player.ItemFishedEvent;
-import net.silvertide.pmmo_quality_foods.PMMOQualityFoods;
+import net.silvertide.pmmo_quality_food.PMMOQualityFood;
+import net.silvertide.pmmo_quality_food.data.UpgradeQuality;
+import net.silvertide.pmmo_quality_food.data.UpgradeType;
+import net.silvertide.pmmo_quality_food.utils.QualityHelper;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-@EventBusSubscriber(modid= PMMOQualityFoods.MODID, bus=EventBusSubscriber.Bus.GAME)
+@EventBusSubscriber(modid= PMMOQualityFood.MODID, bus=EventBusSubscriber.Bus.GAME)
 public class GameEvents {
 
-    // This event is copied from Project MMO's event.
+    // This event is a slightly modified version of Project MMO's Fish Event Handler.
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onItemFished(ItemFishedEvent event) {
-        PMMOQualityFoods.LOGGER.info("My Event");
+        if(event.isCanceled()) return;
+
         Player player = event.getEntity();
         Core core = Core.get(player.level());
 
+        // These next few blocks check if the event should be canceled. We have to recreate this here
+        // because we can't know if this or Project MMO's event is going to fire first and we want to cancel
+        // it as soon as possible.
         if (!core.isActionPermitted(ReqType.TOOL, player.getMainHandItem(), player)) {
             event.setCanceled(true);
             Messenger.sendDenialMsg(ReqType.TOOL, player, player.getMainHandItem().getDisplayName());
@@ -52,12 +60,28 @@ public class GameEvents {
         if (serverSide) {
             Map<String, Long> xpAward = new HashMap<>();
             for (ItemStack stack : event.getDrops()) {
-                core.getExperienceAwards(EventType.FISH, stack, (Player) event.getEntity(), perkOutput).forEach((skill, value) -> {
-                    xpAward.merge(skill, value, Long::sum);
+
+                QualityHelper.upgradeQualityFromSkills(stack, UpgradeType.FISHING);
+
+                // Then award bonus experience based on the quality.
+                core.getExperienceAwards(EventType.FISH, stack, event.getEntity(), perkOutput).forEach((skill, value) -> {
+                    // Only award xp for an item that has quality on it.
+                    if(QualityUtils.hasQuality(stack)) {
+                        PMMOQualityFood.LOGGER.info("Original xp: " + value);
+                        Long modifiedValue = QualityHelper.applyQualityBonus(stack, value);
+                        PMMOQualityFood.LOGGER.info("Modified xp: " + modifiedValue);
+                        Long difference = modifiedValue - value;
+                        PMMOQualityFood.LOGGER.info("Difference: " + difference);
+                        if(difference > 0) {
+                            xpAward.merge(skill, difference, Long::sum);
+                        }
+                    }
                 });;
             }
             List<ServerPlayer> partyMembersInRange = PartyUtils.getPartyMembersInRange((ServerPlayer) player);
             core.awardXP(partyMembersInRange, xpAward);
         }
     }
+
+
 }
