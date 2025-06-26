@@ -1,6 +1,7 @@
 package net.silvertide.pmmo_quality_food.events;
 
 import de.cadentem.quality_food.util.QualityUtils;
+import de.cadentem.quality_food.util.Utils;
 import harmonised.pmmo.api.APIUtils;
 import harmonised.pmmo.api.enums.EventType;
 import harmonised.pmmo.api.enums.ReqType;
@@ -16,9 +17,9 @@ import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.player.ItemFishedEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.silvertide.pmmo_quality_food.PMMOQualityFood;
-import net.silvertide.pmmo_quality_food.data.UpgradeQuality;
-import net.silvertide.pmmo_quality_food.data.UpgradeType;
+import net.silvertide.pmmo_quality_food.data.ActionType;
 import net.silvertide.pmmo_quality_food.utils.QualityHelper;
 
 import java.util.HashMap;
@@ -27,6 +28,38 @@ import java.util.Map;
 
 @EventBusSubscriber(modid= PMMOQualityFood.MODID, bus=EventBusSubscriber.Bus.GAME)
 public class GameEvents {
+
+    @SubscribeEvent
+    public static void onItemCrafted(PlayerEvent.ItemCraftedEvent event) {
+        ItemStack craftedStack = event.getCrafting();
+        if(event.getEntity() instanceof ServerPlayer serverPlayer && Utils.isValidItem(craftedStack)) {
+            // Upgrade quality based on cooking skill
+            QualityHelper.checkAndApplyUpgrades(serverPlayer, craftedStack, ActionType.COOKING);
+
+            if(QualityUtils.hasQuality(craftedStack)) {
+
+                Core core = Core.get(serverPlayer.level());
+                CompoundTag eventHookOutput = new CompoundTag();
+                eventHookOutput = core.getEventTriggerRegistry().executeEventListeners(EventType.CRAFT, event, new CompoundTag());
+                //Process perks
+                CompoundTag perkOutput = TagUtils.mergeTags(eventHookOutput, core.getPerkRegistry().executePerk(EventType.CRAFT, event.getEntity(), eventHookOutput));
+
+                Map<String, Long> xpAward = new HashMap<>();
+                core.getExperienceAwards(EventType.CRAFT, event.getCrafting(), event.getEntity(), perkOutput).forEach((skill, value) -> {
+                    Long modifiedValue = QualityHelper.applyQualityBonus(craftedStack, value);
+                    long difference = modifiedValue - value;
+                    if(difference > 0) {
+                        xpAward.merge(skill, difference, Long::sum);
+                    }
+                });
+
+                if(!xpAward.isEmpty()) {
+                    List<ServerPlayer> partyMembersInRange = PartyUtils.getPartyMembersInRange((ServerPlayer) event.getEntity());
+                    core.awardXP(partyMembersInRange, xpAward);
+                }
+            }
+        }
+    }
 
     // This event is a slightly modified version of Project MMO's Fish Event Handler.
     @SubscribeEvent(priority = EventPriority.LOWEST)
@@ -60,28 +93,23 @@ public class GameEvents {
         if (serverSide) {
             Map<String, Long> xpAward = new HashMap<>();
             for (ItemStack stack : event.getDrops()) {
+                // Calculate if the quality should be upgraded and upgrade it if so.
+                QualityHelper.checkAndApplyUpgrades((ServerPlayer) player, stack, ActionType.FISHING);
 
-                QualityHelper.upgradeQualityFromSkills(stack, UpgradeType.FISHING);
-
-                // Then award bonus experience based on the quality.
+                // Award bonus experience based on the quality.
                 core.getExperienceAwards(EventType.FISH, stack, event.getEntity(), perkOutput).forEach((skill, value) -> {
                     // Only award xp for an item that has quality on it.
                     if(QualityUtils.hasQuality(stack)) {
-                        PMMOQualityFood.LOGGER.info("Original xp: " + value);
                         Long modifiedValue = QualityHelper.applyQualityBonus(stack, value);
-                        PMMOQualityFood.LOGGER.info("Modified xp: " + modifiedValue);
-                        Long difference = modifiedValue - value;
-                        PMMOQualityFood.LOGGER.info("Difference: " + difference);
+                        long difference = modifiedValue - value;
                         if(difference > 0) {
                             xpAward.merge(skill, difference, Long::sum);
                         }
                     }
-                });;
+                });
             }
             List<ServerPlayer> partyMembersInRange = PartyUtils.getPartyMembersInRange((ServerPlayer) player);
             core.awardXP(partyMembersInRange, xpAward);
         }
     }
-
-
 }

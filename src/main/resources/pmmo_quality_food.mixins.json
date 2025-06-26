@@ -1,0 +1,15 @@
+{
+  "required": true,
+  "minVersion": "0.7",
+  "package": "net.silvertide.pmmo_quality_food.mixins",
+  "refmap": "realms_of_reverie.refmap.json",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "BlockMixin"
+  ],
+  "server": [],
+  "client": [],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
