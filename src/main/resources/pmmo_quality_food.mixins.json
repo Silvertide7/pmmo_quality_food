@@ -5,7 +5,9 @@
   "refmap": "realms_of_reverie.refmap.json",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
-    "BlockMixin"
+    "BlockMixin",
+    "FurnaceResultSlotMixin",
+    "farmersdelight.CookingPotResultSlotMixin"
   ],
   "server": [],
   "client": [],

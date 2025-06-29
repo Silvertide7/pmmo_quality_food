@@ -22,14 +22,12 @@ import net.silvertide.pmmo_quality_food.PMMOQualityFood;
 import net.silvertide.pmmo_quality_food.data.ActionType;
 import net.silvertide.pmmo_quality_food.utils.QualityHelper;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @EventBusSubscriber(modid= PMMOQualityFood.MODID, bus=EventBusSubscriber.Bus.GAME)
 public class GameEvents {
 
-    @SubscribeEvent
+    @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onItemCrafted(PlayerEvent.ItemCraftedEvent event) {
         ItemStack craftedStack = event.getCrafting();
         if(event.getEntity() instanceof ServerPlayer serverPlayer && Utils.isValidItem(craftedStack)) {
@@ -37,26 +35,14 @@ public class GameEvents {
             QualityHelper.checkAndApplyUpgrades(serverPlayer, craftedStack, ActionType.COOKING);
 
             if(QualityUtils.hasQuality(craftedStack)) {
-
                 Core core = Core.get(serverPlayer.level());
                 CompoundTag eventHookOutput = new CompoundTag();
                 eventHookOutput = core.getEventTriggerRegistry().executeEventListeners(EventType.CRAFT, event, new CompoundTag());
                 //Process perks
                 CompoundTag perkOutput = TagUtils.mergeTags(eventHookOutput, core.getPerkRegistry().executePerk(EventType.CRAFT, event.getEntity(), eventHookOutput));
 
-                Map<String, Long> xpAward = new HashMap<>();
-                core.getExperienceAwards(EventType.CRAFT, event.getCrafting(), event.getEntity(), perkOutput).forEach((skill, value) -> {
-                    Long modifiedValue = QualityHelper.applyQualityBonus(craftedStack, value);
-                    long difference = modifiedValue - value;
-                    if(difference > 0) {
-                        xpAward.merge(skill, difference, Long::sum);
-                    }
-                });
-
-                if(!xpAward.isEmpty()) {
-                    List<ServerPlayer> partyMembersInRange = PartyUtils.getPartyMembersInRange((ServerPlayer) event.getEntity());
-                    core.awardXP(partyMembersInRange, xpAward);
-                }
+                Map<String, Long> xpAward = core.getExperienceAwards(EventType.CRAFT, event.getCrafting(), event.getEntity(), perkOutput);
+                QualityHelper.grantXpDifference(core, serverPlayer, craftedStack, xpAward);
             }
         }
     }
@@ -92,24 +78,30 @@ public class GameEvents {
         CompoundTag perkOutput = TagUtils.mergeTags(eventHookOutput, core.getPerkRegistry().executePerk(EventType.FISH, player, eventHookOutput));
         if (serverSide) {
             Map<String, Long> xpAward = new HashMap<>();
-            for (ItemStack stack : event.getDrops()) {
-                // Calculate if the quality should be upgraded and upgrade it if so.
-                QualityHelper.checkAndApplyUpgrades((ServerPlayer) player, stack, ActionType.FISHING);
 
-                // Award bonus experience based on the quality.
-                core.getExperienceAwards(EventType.FISH, stack, event.getEntity(), perkOutput).forEach((skill, value) -> {
-                    // Only award xp for an item that has quality on it.
-                    if(QualityUtils.hasQuality(stack)) {
-                        Long modifiedValue = QualityHelper.applyQualityBonus(stack, value);
-                        long difference = modifiedValue - value;
-                        if(difference > 0) {
-                            xpAward.merge(skill, difference, Long::sum);
+            for (ItemStack stack : event.getDrops()) {
+                if(Utils.isValidItem(stack)) {
+                    // Calculate if the quality should be upgraded and upgrade it if so.
+                    QualityHelper.checkAndApplyUpgrades((ServerPlayer) player, stack, ActionType.FISHING);
+
+                    // Award bonus experience based on the quality.
+                    core.getExperienceAwards(EventType.FISH, stack, event.getEntity(), perkOutput).forEach((skill, value) -> {
+                        // Only award xp for an item that has quality on it.
+                        if(QualityUtils.hasQuality(stack)) {
+                            Long modifiedValue = QualityHelper.applyQualityBonus(stack, value);
+                            long difference = modifiedValue - value;
+                            if(difference > 0) {
+                                xpAward.merge(skill, difference, Long::sum);
+                            }
                         }
-                    }
-                });
+                    });
+                }
+
             }
-            List<ServerPlayer> partyMembersInRange = PartyUtils.getPartyMembersInRange((ServerPlayer) player);
-            core.awardXP(partyMembersInRange, xpAward);
+            if(!xpAward.isEmpty()) {
+                List<ServerPlayer> partyMembersInRange = PartyUtils.getPartyMembersInRange((ServerPlayer) player);
+                core.awardXP(partyMembersInRange, xpAward);
+            }
         }
     }
 }

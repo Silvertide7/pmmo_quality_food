@@ -3,14 +3,36 @@ package net.silvertide.pmmo_quality_food.utils;
 import de.cadentem.quality_food.core.codecs.Quality;
 import de.cadentem.quality_food.util.QualityUtils;
 import harmonised.pmmo.api.APIUtils;
+import harmonised.pmmo.core.Core;
+import harmonised.pmmo.features.party.PartyUtils;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 import net.silvertide.pmmo_quality_food.data.UpgradeQuality;
 import net.silvertide.pmmo_quality_food.data.ActionType;
 import net.silvertide.pmmo_quality_food.config.Config;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 public final class QualityHelper {
     private QualityHelper() {}
+
+    public static void grantXpDifference(Core core, ServerPlayer serverPlayer, ItemStack stack, Map<String, Long> xpMap) {
+
+        Map<String, Long> xpAward = new HashMap<>();
+        xpMap.forEach((skill, value) -> {
+            Long modifiedValue = QualityHelper.applyQualityBonus(stack, value);
+            long difference = modifiedValue - value;
+            if(difference > 0) {
+                xpAward.merge(skill, difference, Long::sum);
+            }
+        });
+        if(!xpAward.isEmpty()) {
+            List<ServerPlayer> partyMembersInRange = PartyUtils.getPartyMembersInRange(serverPlayer);
+            core.awardXP(partyMembersInRange, xpAward);
+        }
+    }
 
     public static Long applyQualityBonus(ItemStack stack, Long xpValue) {
         Quality quality = QualityUtils.getQuality(stack);

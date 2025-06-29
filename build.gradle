@@ -115,6 +115,8 @@ configurations {
 dependencies {
     implementation "curse.maven:pmmo-353935:${pmmo_version}"
     implementation "curse.maven:qualityfoods-973932:${quality_foods_version}"
+
+    compileOnly "curse.maven:farmers-delight-398521:5878217"
 }
 
 // This block of code expands all declared replace properties in the specified resource targets.
